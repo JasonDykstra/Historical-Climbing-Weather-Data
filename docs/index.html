@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climbing Weather History</title>
+  <meta name="description" content="Historical daily temperatures for climbing destinations." />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Climbing Weather History</h1>
+      <p class="tagline">Daily temperature climate for climbing destinations &mdash; find your season.</p>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <!-- Controls -->
+    <aside class="panel controls" aria-label="Chart controls">
+      <div class="field">
+        <label for="location">Location</label>
+        <select id="location"></select>
+      </div>
+
+      <div class="field">
+        <label for="year">Years</label>
+        <select id="year"></select>
+        <p class="hint" id="year-hint"></p>
+      </div>
+
+      <fieldset class="field">
+        <legend>Show on chart</legend>
+        <label class="check"><input type="checkbox" id="toggle-high" checked /> <span class="swatch swatch-high"></span> Daily high</label>
+        <label class="check"><input type="checkbox" id="toggle-avg" checked /> <span class="swatch swatch-avg"></span> Average</label>
+        <label class="check"><input type="checkbox" id="toggle-low" checked /> <span class="swatch swatch-low"></span> Daily low</label>
+        <label class="check"><input type="checkbox" id="toggle-band" checked /> <span class="swatch swatch-band"></span> High&ndash;low range</label>
+      </fieldset>
+
+      <div class="field">
+        <label for="smoothing">Smoothing</label>
+        <select id="smoothing">
+          <option value="1">None (raw daily)</option>
+          <option value="7" selected>7-day average</option>
+          <option value="14">14-day average</option>
+          <option value="30">30-day average</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <span class="label-row">
+          <label>Units</label>
+          <div class="segmented" role="group" aria-label="Units">
+            <button type="button" id="unit-f" class="seg active" aria-pressed="true">&deg;F</button>
+            <button type="button" id="unit-c" class="seg" aria-pressed="false">&deg;C</button>
+          </div>
+        </span>
+      </div>
+
+      <fieldset class="field pref">
+        <legend>Preferable temperature</legend>
+        <p class="hint">Shaded band on the chart. Tune it to your ideal climbing range.</p>
+        <div class="range-inputs">
+          <label>Min <input type="number" id="pref-min" value="45" step="1" /></label>
+          <label>Max <input type="number" id="pref-max" value="65" step="1" /></label>
+          <span class="unit-suffix" id="pref-unit">&deg;F</span>
+        </div>
+        <label class="check"><input type="checkbox" id="toggle-pref" checked /> Show preferable band</label>
+        <div class="stat" id="pref-stat"></div>
+      </fieldset>
+    </aside>
+
+    <!-- Chart -->
+    <section class="panel chart-card">
+      <div class="chart-head">
+        <h2 id="chart-title">&nbsp;</h2>
+      </div>
+      <div class="chart-holder">
+        <canvas id="chart" aria-label="Temperature chart" role="img"></canvas>
+      </div>
+      <p class="footnote" id="footnote"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>Data via Visual Crossing. Temperatures aligned to a 365-day calendar.</span>
+      <a href="https://github.com/JasonDykstra/Historical-Climbing-Weather-Data" target="_blank" rel="noopener">Source on GitHub</a>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
