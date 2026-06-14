@@ -119,14 +119,22 @@ def main():
         registry = json.load(f)
 
     locations = {}
-    for slug, name in registry.items():
+    for slug, meta in registry.items():
+        # meta is either a plain name (legacy) or {"name", "lat", "lon"}.
+        if isinstance(meta, str):
+            meta = {"name": meta}
         path = csv_for_slug(slug)
         if path is None:
             print(f"  skip (no CSV for slug '{slug}')")
             continue
-        locations[slug] = {"name": name, **load_location(path)}
+        locations[slug] = {
+            "name": meta["name"],
+            "lat": meta.get("lat"),
+            "lon": meta.get("lon"),
+            **load_location(path),
+        }
         years = locations[slug]["years"]
-        print(f"  loaded {name}: {years}")
+        print(f"  loaded {meta['name']}: {years}")
 
     payload = {"locations": locations}
     os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)

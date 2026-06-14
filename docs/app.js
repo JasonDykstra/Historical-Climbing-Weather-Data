@@ -30,6 +30,24 @@
     return Math.round((s + next) / 2);
   });
 
+  // Dark-theme chart colors (kept in sync with styles.css).
+  const C = {
+    high: "#f87171",
+    avg: "#cbd5e1",
+    low: "#60a5fa",
+    band: "rgba(148, 163, 184, 0.16)",
+    grid: "rgba(148, 163, 184, 0.12)",
+    axisLine: "rgba(148, 163, 184, 0.25)",
+    tick: "#8b98a5",
+    axisTitle: "#9aa7b4",
+    tooltipBg: "#1b232c",
+    tooltipBorder: "#2a3540",
+    monthLine: "rgba(148, 163, 184, 0.18)",
+    prefBg: "rgba(52, 211, 153, 0.16)",
+    prefBorder: "rgba(52, 211, 153, 0.45)",
+    prefLabel: "#34d399",
+  };
+
   // ----- DOM -----
   const el = (id) => document.getElementById(id);
   const ui = {
@@ -51,6 +69,9 @@
     title: el("chart-title"),
     footnote: el("footnote"),
     canvas: el("chart"),
+    openMapBtn: el("open-map"),
+    closeMapBtn: el("close-map"),
+    mapOverlay: el("map-overlay"),
   };
 
   let unit = "F"; // "F" or "C"
@@ -149,7 +170,7 @@
     const lo = smooth(s.lo, smoothing);
     const avg = smooth(s.avg, smoothing);
 
-    const bandColor = "rgba(99, 102, 110, 0.12)";
+    const bandColor = C.band;
     const ds = [];
 
     // Band (drawn first / behind): low boundary then high filling down to it.
@@ -161,9 +182,9 @@
     }));
 
     // Visible lines.
-    ds.push(lineDataset("Daily low", toPoints(lo), "#3b82f6", { hidden: !ui.low.checked }));
-    ds.push(lineDataset("Average", toPoints(avg), "#6b7280", { hidden: !ui.avg.checked }));
-    ds.push(lineDataset("Daily high", toPoints(hi), "#ef6c47", { hidden: !ui.high.checked }));
+    ds.push(lineDataset("Daily low", toPoints(lo), C.low, { hidden: !ui.low.checked }));
+    ds.push(lineDataset("Average", toPoints(avg), C.avg, { hidden: !ui.avg.checked }));
+    ds.push(lineDataset("Daily high", toPoints(hi), C.high, { hidden: !ui.high.checked }));
     return ds;
   }
 
@@ -174,7 +195,7 @@
       if (i === 0) return;
       ann["m" + i] = {
         type: "line", xMin: d, xMax: d,
-        borderColor: "rgba(150,160,170,0.35)", borderWidth: 1, borderDash: [4, 4],
+        borderColor: C.monthLine, borderWidth: 1, borderDash: [4, 4],
       };
     });
     // Preferable temperature band.
@@ -185,11 +206,11 @@
         ann.pref = {
           type: "box",
           yMin: Math.min(lo, hi), yMax: Math.max(lo, hi),
-          backgroundColor: "rgba(34, 197, 94, 0.13)",
-          borderColor: "rgba(34, 197, 94, 0.35)", borderWidth: 1,
+          backgroundColor: C.prefBg,
+          borderColor: C.prefBorder, borderWidth: 1,
           label: {
             display: true, content: "Preferable", position: { x: "start", y: "start" },
-            color: "#15803d", backgroundColor: "rgba(255,255,255,0)",
+            color: C.prefLabel, backgroundColor: "rgba(0,0,0,0)",
             font: { size: 11, weight: "600" }, padding: 4,
           },
         };
@@ -217,9 +238,9 @@
           x: {
             type: "linear", min: 1, max: 365,
             grid: { display: false, drawTicks: false },
-            border: { color: "#e4e7eb" },
+            border: { color: C.axisLine },
             ticks: {
-              color: "#9aa5b1", font: { size: 12 }, autoSkip: false, maxRotation: 0,
+              color: C.tick, font: { size: 12 }, autoSkip: false, maxRotation: 0,
               callback: (v) => {
                 const i = MONTH_MIDS.indexOf(v);
                 return i >= 0 ? MONTH_NAMES[i] : "";
@@ -228,16 +249,18 @@
             afterBuildTicks: (axis) => { axis.ticks = MONTH_MIDS.map((v) => ({ value: v })); },
           },
           y: {
-            grid: { color: "#eef1f4" },
+            grid: { color: C.grid },
             border: { display: false },
-            ticks: { color: "#9aa5b1", font: { size: 12 }, callback: (v) => v + "°" },
-            title: { display: true, text: "Temperature (°" + unit + ")", color: "#52606d", font: { size: 12 } },
+            ticks: { color: C.tick, font: { size: 12 }, callback: (v) => v + "°" },
+            title: { display: true, text: "Temperature (°" + unit + ")", color: C.axisTitle, font: { size: 12 } },
           },
         },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#1f2933", padding: 10, cornerRadius: 8, titleFont: { size: 12 }, bodyFont: { size: 12 },
+            backgroundColor: C.tooltipBg, borderColor: C.tooltipBorder, borderWidth: 1,
+            titleColor: "#e6edf3", bodyColor: "#cbd5e1",
+            padding: 10, cornerRadius: 8, titleFont: { size: 12 }, bodyFont: { size: 12 },
             filter: (item) => !item.dataset.label.startsWith("_"),
             callbacks: {
               title: (items) => (items.length ? dayToLabel(items[0].parsed.x) : ""),
@@ -302,13 +325,27 @@
     populateYears(ids[0]);
 
     // Events
-    ui.location.addEventListener("change", () => { populateYears(ui.location.value); render(); });
+    ui.location.addEventListener("change", () => selectLocation(ui.location.value));
     [ui.year, ui.smoothing].forEach((c) => c.addEventListener("change", render));
     [ui.high, ui.avg, ui.low, ui.band, ui.prefToggle].forEach((c) => c.addEventListener("change", render));
     [ui.prefMin, ui.prefMax].forEach((c) => c.addEventListener("input", render));
     ui.unitF.addEventListener("click", () => setUnit("F"));
     ui.unitC.addEventListener("click", () => setUnit("C"));
 
+    // Map picker
+    ui.openMapBtn.addEventListener("click", openMap);
+    ui.closeMapBtn.addEventListener("click", closeMap);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !ui.mapOverlay.hidden) closeMap();
+    });
+
+    render();
+  }
+
+  function selectLocation(slug) {
+    if (!DATA[slug]) return;
+    ui.location.value = slug;
+    populateYears(slug);
     render();
   }
 
@@ -345,6 +382,55 @@
     ui.unitC.setAttribute("aria-pressed", String(unit === "C"));
     ui.prefUnit.innerHTML = "°" + unit;
     render();
+  }
+
+  // ----- Full-screen map picker -----
+  let map = null;
+
+  function initMap() {
+    map = L.map("map", { worldCopyJump: true, zoomControl: true }).setView([30, 0], 2);
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 19,
+    }).addTo(map);
+
+    const pinIcon = L.divIcon({
+      className: "map-pin",
+      html: '<span class="dot"></span>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+
+    const points = [];
+    Object.keys(DATA).forEach((slug) => {
+      const loc = DATA[slug];
+      if (loc.lat == null || loc.lon == null) return;
+      L.marker([loc.lat, loc.lon], { icon: pinIcon, keyboard: false })
+        .addTo(map)
+        .bindTooltip(loc.name, { className: "loc-tip", direction: "top", offset: [0, -10] })
+        .on("click", () => { selectLocation(slug); closeMap(); });
+      points.push([loc.lat, loc.lon]);
+    });
+
+    map.invalidateSize();
+    if (points.length) map.fitBounds(points, { padding: [60, 60], maxZoom: 6 });
+  }
+
+  function openMap() {
+    if (typeof L === "undefined") return; // Leaflet failed to load
+    ui.mapOverlay.hidden = false;
+    // The container only has a size once the overlay is shown.
+    requestAnimationFrame(() => {
+      if (!map) initMap();
+      else map.invalidateSize();
+    });
+  }
+
+  function closeMap() {
+    ui.mapOverlay.hidden = true;
   }
 
   init();

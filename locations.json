@@ -1,12 +1,52 @@
 {
-  "red_rocks": "Red Rocks, NV",
-  "vegas": "Las Vegas, NV",
-  "squamish": "Squamish, BC",
-  "brione_verzasca": "Brione Verzasca, Switzerland",
-  "index": "Index, WA",
-  "leavenworth": "Leavenworth, WA",
-  "pawtuckaway": "Pawtuckaway, NH",
-  "gunks": "The Gunks, NY",
-  "hueco_tanks": "Hueco Tanks, TX",
-  "fontainebleau": "Fontainebleau, France"
+  "red_rocks": {
+    "name": "Red Rocks, NV",
+    "lat": 36.135,
+    "lon": -115.427
+  },
+  "vegas": {
+    "name": "Las Vegas, NV",
+    "lat": 36.1719,
+    "lon": -115.14
+  },
+  "squamish": {
+    "name": "Squamish, BC",
+    "lat": 49.7016,
+    "lon": -123.1558
+  },
+  "brione_verzasca": {
+    "name": "Brione Verzasca, Switzerland",
+    "lat": 46.2998,
+    "lon": 8.7924
+  },
+  "index": {
+    "name": "Index, WA",
+    "lat": 47.8204,
+    "lon": -121.5551
+  },
+  "leavenworth": {
+    "name": "Leavenworth, WA",
+    "lat": 47.5962,
+    "lon": -120.6615
+  },
+  "pawtuckaway": {
+    "name": "Pawtuckaway, NH",
+    "lat": 43.0925,
+    "lon": -71.167
+  },
+  "gunks": {
+    "name": "The Gunks, NY",
+    "lat": 41.738,
+    "lon": -74.189
+  },
+  "hueco_tanks": {
+    "name": "Hueco Tanks, TX",
+    "lat": 31.9216,
+    "lon": -106.0436
+  },
+  "fontainebleau": {
+    "name": "Fontainebleau, France",
+    "lat": 48.404,
+    "lon": 2.702
+  }
 }

@@ -12,7 +12,7 @@ a year actually land in it.
 
 ```
 *.csv                  Raw daily weather per location (from Visual Crossing)
-locations.json         Registry: slug -> display name shown on the site
+locations.json         Registry: slug -> { name, lat, lon } (drives the map pins)
 get_weather_data.py    Fetches a location, registers it, and rebuilds the data
 build_data.py          Bundles the registered CSVs into docs/data.js
 docs/                  The website (served by GitHub Pages)
@@ -63,9 +63,18 @@ commit the result. The key is only ever used locally and never deployed.
 3. Commit the new CSV, `locations.json`, and `docs/data.js`, then push. The
    site updates after GitHub Pages redeploys.
 
+   The script prints each query's **resolved address** and the captured
+   lat/lon. Always check it — Visual Crossing's geocoder can pick the wrong
+   place (e.g. "Red Rocks, NV" resolves to Australia, "Hueco Tanks, TX" to a
+   street near Houston). For anything ambiguous, pass coordinates directly:
+
+   ```bash
+   python3 get_weather_data.py "36.135,-115.427" red_rocks --name "Red Rocks, NV" --years 4
+   ```
+
 > Heads-up on quota: Visual Crossing's free tier is ~1,000 records/day and one
-> location-year is ~365 records, so fetching 3 years (~1,095 records) can use a
-> full day's allowance. Fetch deliberately.
+> location-year is ~365 records, so fetching 4 years (~1,460 records) can use
+> more than a full day's allowance. Fetch deliberately.
 
 ## Enable GitHub Pages
 

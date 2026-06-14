@@ -6,6 +6,8 @@
   <title>Climbing Weather History</title>
   <meta name="description" content="Historical daily temperatures for climbing destinations." />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -21,7 +23,13 @@
     <aside class="panel controls" aria-label="Chart controls">
       <div class="field">
         <label for="location">Location</label>
-        <select id="location"></select>
+        <div class="location-row">
+          <select id="location"></select>
+          <button type="button" id="open-map" class="map-btn" title="Pick a location on the map" aria-label="Pick a location on the map">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+            Map
+          </button>
+        </div>
       </div>
 
       <div class="field">
@@ -90,6 +98,16 @@
     </div>
   </footer>
 
+  <!-- Full-screen map for picking a location -->
+  <div id="map-overlay" class="map-overlay" hidden>
+    <div class="map-bar">
+      <span class="map-title">Choose a location</span>
+      <button type="button" id="close-map" class="map-close" aria-label="Close map">&times;</button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
   <script src="data.js"></script>

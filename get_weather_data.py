@@ -63,8 +63,7 @@ def fetch_weather_for_year(year, location, api_key):
     return data
 
 
-def rows_for_year(year, location, api_key):
-    data = fetch_weather_for_year(year, location, api_key)
+def extract_rows(data):
     rows = []
     for day in data.get("days", []):
         rows.append({
@@ -87,12 +86,16 @@ FIELDNAMES = [
 ]
 
 
-def update_registry(slug, name):
+def update_registry(slug, name, lat, lon):
     registry = {}
     if os.path.exists(REGISTRY):
         with open(REGISTRY) as f:
             registry = json.load(f)
-    registry[slug] = name
+    entry = {"name": name}
+    if lat is not None and lon is not None:
+        entry["lat"] = round(float(lat), 4)
+        entry["lon"] = round(float(lon), 4)
+    registry[slug] = entry
     with open(REGISTRY, "w") as f:
         json.dump(registry, f, indent=2)
         f.write("\n")
@@ -116,8 +119,12 @@ def main():
     print(f"Fetching {args.location} for {years[0]}-{years[-1]}...")
 
     all_rows = []
+    lat = lon = None
     for year in years:
-        all_rows.extend(rows_for_year(year, args.location, API_KEY))
+        data = fetch_weather_for_year(year, args.location, API_KEY)
+        all_rows.extend(extract_rows(data))
+        if lat is None:  # capture coordinates from the first response
+            lat, lon = data.get("latitude"), data.get("longitude")
 
     # One CSV per slug: clear any older year-range files for this slug first.
     for old in glob.glob(os.path.join(HERE, args.slug + "_weather*.csv")):
@@ -130,8 +137,8 @@ def main():
         writer.writerows(all_rows)
     print(f"Saved {output}")
 
-    update_registry(args.slug, args.name or args.location)
-    print(f"Registered '{args.slug}' in locations.json")
+    update_registry(args.slug, args.name or args.location, lat, lon)
+    print(f"Registered '{args.slug}' in locations.json (lat={lat}, lon={lon})")
 
     if not args.no_build:
         import build_data
