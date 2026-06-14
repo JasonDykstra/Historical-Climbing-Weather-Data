@@ -12,8 +12,9 @@ a year actually land in it.
 
 ```
 *.csv                  Raw daily weather per location (from Visual Crossing)
-get_weather_data.py    Fetches a location's CSV from the Visual Crossing API
-build_data.py          Bundles all CSVs into docs/data.js
+locations.json         Registry: slug -> display name shown on the site
+get_weather_data.py    Fetches a location, registers it, and rebuilds the data
+build_data.py          Bundles the registered CSVs into docs/data.js
 docs/                  The website (served by GitHub Pages)
   index.html
   styles.css
@@ -37,24 +38,34 @@ python3 -m http.server 8000
 
 ## Add a new location
 
-1. Fetch the data. Set your Visual Crossing API key once, then point
-   `get_weather_data.py` at the location (edit `LOCATION` / `OUTPUT_FILENAME`):
+This site is owner-curated: you fetch a location once with your own API key and
+commit the result. The key is only ever used locally and never deployed.
+
+1. Set your Visual Crossing API key once per shell:
 
    ```bash
    export VISUALCROSSING_API_KEY="your_key_here"
-   python3 get_weather_data.py
    ```
 
-2. Register the new CSV in the `LOCATIONS` list in `build_data.py` with a
-   display name.
-
-3. Rebuild the site data:
+2. Fetch + register + rebuild in one command (positional args are the Visual
+   Crossing query and a filename-safe slug):
 
    ```bash
-   python3 build_data.py
+   python3 get_weather_data.py "Smith Rock, OR" smith_rock
+   # optional: nicer display name, or a different number of years
+   python3 get_weather_data.py "Brione Verzasca,Switzerland" brione_verzasca \
+       --name "Brione Verzasca, Switzerland" --years 3
    ```
 
-4. Commit the new CSV and the regenerated `docs/data.js`.
+   This writes `smith_rock_weather_<years>.csv`, adds the location to
+   `locations.json`, and regenerates `docs/data.js` automatically.
+
+3. Commit the new CSV, `locations.json`, and `docs/data.js`, then push. The
+   site updates after GitHub Pages redeploys.
+
+> Heads-up on quota: Visual Crossing's free tier is ~1,000 records/day and one
+> location-year is ~365 records, so fetching 3 years (~1,095 records) can use a
+> full day's allowance. Fetch deliberately.
 
 ## Enable GitHub Pages
 

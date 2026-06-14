@@ -13,6 +13,7 @@ Run:  python build_data.py
 
 import calendar
 import csv
+import glob
 import json
 import os
 from collections import defaultdict
@@ -20,15 +21,21 @@ from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUTPUT = os.path.join(HERE, "docs", "data.js")
+REGISTRY = os.path.join(HERE, "locations.json")
 
-# CSV file (relative to this script) -> display name shown in the site.
-# Add a line here to publish another stashed location.
-LOCATIONS = [
-    ("red_rocks_weather_2022_2024.csv", "Red Rocks, NV"),
-    ("vegas_weather_2022_2024.csv", "Las Vegas, NV"),
-    ("squamish_weather_2022_2024.csv", "Squamish, BC"),
-    ("brione_verzasca_weather_2022_2024.csv", "Brione Verzasca, Switzerland"),
-]
+# locations.json maps a slug -> display name. The CSV for a slug is found by
+# globbing "<slug>_weather*.csv". Add a location by running get_weather_data.py
+# (which fetches the CSV and updates locations.json for you).
+
+
+def csv_for_slug(slug):
+    """Return the CSV path for a slug, or None if no file matches.
+
+    If several match (e.g. different year ranges), the last by name wins, which
+    is the newest year range.
+    """
+    matches = sorted(glob.glob(os.path.join(HERE, slug + "_weather*.csv")))
+    return matches[-1] if matches else None
 
 
 def to_float(value):
@@ -108,15 +115,17 @@ def load_location(csv_path):
 
 
 def main():
+    with open(REGISTRY) as f:
+        registry = json.load(f)
+
     locations = {}
-    for filename, name in LOCATIONS:
-        path = os.path.join(HERE, filename)
-        if not os.path.exists(path):
-            print(f"  skip (not found): {filename}")
+    for slug, name in registry.items():
+        path = csv_for_slug(slug)
+        if path is None:
+            print(f"  skip (no CSV for slug '{slug}')")
             continue
-        loc_id = filename.replace("_weather_2022_2024.csv", "")
-        locations[loc_id] = {"name": name, **load_location(path)}
-        years = locations[loc_id]["years"]
+        locations[slug] = {"name": name, **load_location(path)}
+        years = locations[slug]["years"]
         print(f"  loaded {name}: {years}")
 
     payload = {"locations": locations}
