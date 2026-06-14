@@ -30,7 +30,9 @@ html, body {
 }
 
 .wrap {
-  max-width: 1140px;
+  /* Halve the side gutters vs. the old fixed 1140px column.
+     gutter' = gutter/2  =>  width = viewport/2 + 570px (capped to full width). */
+  width: min(100%, calc(50vw + 570px));
   margin: 0 auto;
   padding: 0 24px;
 }
