@@ -387,14 +387,32 @@
   // ----- Full-screen map picker -----
   let map = null;
 
+  // Web Mercator caps latitude near +/-85.0511, which makes the world square.
+  const WORLD_BOUNDS = () => L.latLngBounds([[-85.0511, -180], [85.0511, 180]]);
+
+  function applyMinZoom() {
+    // Smallest zoom at which the whole world still fits. On a landscape screen
+    // this is limited by the vertical extent, so you can't zoom out past the
+    // point where the map fills the height (and thus can't make it wrap).
+    map.setMinZoom(map.getBoundsZoom(WORLD_BOUNDS()));
+  }
+
   function initMap() {
-    map = L.map("map", { worldCopyJump: true, zoomControl: true }).setView([30, 0], 2);
+    map = L.map("map", {
+      zoomControl: true,
+      zoomSnap: 0, // let the world fit the height exactly, not just integer zooms
+      worldCopyJump: false,
+      maxBounds: WORLD_BOUNDS(),
+      maxBoundsViscosity: 1.0,
+    }).setView([30, 0], 2);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 19,
+      noWrap: true, // don't repeat the world horizontally
+      bounds: WORLD_BOUNDS(),
     }).addTo(map);
 
     const pinIcon = L.divIcon({
@@ -416,6 +434,8 @@
     });
 
     map.invalidateSize();
+    applyMinZoom();
+    window.addEventListener("resize", applyMinZoom);
     if (points.length) map.fitBounds(points, { padding: [60, 60], maxZoom: 6 });
   }
 
@@ -425,7 +445,7 @@
     // The container only has a size once the overlay is shown.
     requestAnimationFrame(() => {
       if (!map) initMap();
-      else map.invalidateSize();
+      else { map.invalidateSize(); applyMinZoom(); }
     });
   }
 
