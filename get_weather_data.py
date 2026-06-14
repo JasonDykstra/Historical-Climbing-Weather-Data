@@ -57,7 +57,10 @@ def fetch_weather_for_year(year, location, api_key):
         print(f"Error fetching data for {year}: {response.status_code}")
         print(response.text)
         sys.exit(1)
-    return response.json()
+    data = response.json()
+    if "resolvedAddress" in data:
+        print(f"    resolved to: {data['resolvedAddress']}")
+    return data
 
 
 def rows_for_year(year, location, api_key):
