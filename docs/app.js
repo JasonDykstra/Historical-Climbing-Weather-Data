@@ -441,7 +441,7 @@
 
   // ----- Populate controls -----
   function init() {
-    const ids = Object.keys(DATA);
+    const ids = Object.keys(DATA).sort((a, b) => DATA[a].name.localeCompare(DATA[b].name));
     if (ids.length === 0) {
       ui.title.textContent = "No data found";
       ui.footnote.textContent = "Run build_data.py to generate docs/data.js.";
