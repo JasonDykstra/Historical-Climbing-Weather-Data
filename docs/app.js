@@ -415,7 +415,7 @@
   const WORLD_BOUNDS = () => L.latLngBounds([[-85.0511, -180], [85.0511, 180]]);
   // Extra zoom on top of the world-fits-vertically floor; higher = tighter
   // (you can't zoom out as far).
-  const MIN_ZOOM_MARGIN = 0.5;
+  const MIN_ZOOM_MARGIN = 1.0;
 
   function applyMinZoom() {
     // Base = the zoom at which the world just fills the viewport height (the
