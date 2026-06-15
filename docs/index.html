@@ -83,9 +83,12 @@
     <section class="panel chart-card">
       <div class="chart-head">
         <h2 id="chart-title">&nbsp;</h2>
+        <button type="button" id="reset-zoom" class="reset-zoom" hidden>Reset zoom</button>
       </div>
+      <p class="chart-hint">Drag across the chart to zoom into a region &middot; double-click to reset.</p>
       <div class="chart-holder">
         <canvas id="chart" aria-label="Temperature chart" role="img"></canvas>
+        <div id="zoom-box" class="zoom-box" hidden></div>
       </div>
       <p class="footnote" id="footnote"></p>
     </section>

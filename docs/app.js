@@ -30,6 +30,11 @@
     return Math.round((s + next) / 2);
   });
 
+  // Zoom thresholds: when the visible range shrinks to this size, the axis
+  // switches to a finer tick scheme (per-day on x, per-degree on y).
+  const X_DAY_SPAN = 75; // days
+  const Y_DEG_SPAN = 26; // degrees
+
   // Dark-theme chart colors (kept in sync with styles.css).
   const C = {
     high: "#f87171",
@@ -72,24 +77,36 @@
     openMapBtn: el("open-map"),
     closeMapBtn: el("close-map"),
     mapOverlay: el("map-overlay"),
+    resetZoomBtn: el("reset-zoom"),
+    zoomBox: el("zoom-box"),
   };
 
   let unit = "F"; // "F" or "C"
   let chart = null;
+  // Current crop from drag-to-zoom, or null for the full view.
+  // { xmin, xmax } are day indices (1..365); { ymin, ymax } are in display units.
+  let zoomState = null;
 
   // ----- Helpers -----
   const toC = (f) => (f - 32) * 5 / 9;
   const conv = (f) => (f == null ? null : unit === "C" ? toC(f) : f);
   const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
-  function dayToLabel(d) {
-    let m = 0;
+  function monthIndexOf(d) {
     for (let i = 0; i < 12; i++) {
       const next = i < 11 ? MONTH_STARTS[i + 1] : MONTH_END;
-      if (d >= MONTH_STARTS[i] && d < next) { m = i; break; }
+      if (d >= MONTH_STARTS[i] && d < next) return i;
     }
-    const day = d - MONTH_STARTS[m] + 1;
-    return MONTH_NAMES[m] + " " + day;
+    return 11;
+  }
+
+  function dayOfMonth(d) {
+    return d - MONTH_STARTS[monthIndexOf(d)] + 1;
+  }
+
+  function dayToLabel(d) {
+    const m = monthIndexOf(d);
+    return MONTH_NAMES[m] + " " + (d - MONTH_STARTS[m] + 1);
   }
 
   // Build dense per-day arrays (index 1..365) for a location + year selection.
@@ -219,12 +236,53 @@
     return ann;
   }
 
+  // ----- Adaptive axis ticks (respond to the current zoom range) -----
+  // x: month names when zoomed out, a tick per day when zoomed in.
+  function xAfterBuildTicks(axis) {
+    const min = axis.min, max = axis.max;
+    if (max - min > X_DAY_SPAN) {
+      axis.ticks = MONTH_MIDS.filter((v) => v >= min && v <= max).map((v) => ({ value: v }));
+    } else {
+      const start = Math.max(1, Math.ceil(min));
+      const end = Math.min(365, Math.floor(max));
+      const ticks = [];
+      for (let d = start; d <= end; d++) ticks.push({ value: d });
+      axis.ticks = ticks;
+    }
+  }
+
+  function xTickLabel(value) {
+    // `this` is the scale, so this.min/max reflect the live zoom range.
+    if (this.max - this.min > X_DAY_SPAN) {
+      const i = MONTH_MIDS.indexOf(value);
+      return i >= 0 ? MONTH_NAMES[i] : "";
+    }
+    const dom = dayOfMonth(value);
+    if (dom % 5 !== 0) return ""; // tick for every day, label only multiples of 5
+    return dom === 5 ? MONTH_NAMES[monthIndexOf(value)] + " 5" : String(dom);
+  }
+
+  // y: 1-degree ticks once the visible range is small enough.
+  function yAfterBuildTicks(axis) {
+    const span = axis.max - axis.min;
+    if (span > 0 && span <= Y_DEG_SPAN) {
+      const start = Math.ceil(axis.min);
+      const end = Math.floor(axis.max);
+      const ticks = [];
+      for (let t = start; t <= end; t++) ticks.push({ value: t });
+      if (ticks.length) axis.ticks = ticks;
+    }
+  }
+
   function render() {
     const locId = ui.location.value;
     const yearKey = ui.year.value;
     const smoothing = parseInt(ui.smoothing.value, 10);
     const s = rawSeries(locId, yearKey);
     const datasets = buildDatasets(s, smoothing);
+
+    // Show per-day tick marks only when zoomed in tight enough horizontally.
+    const dayModeX = !!zoomState && zoomState.xmax - zoomState.xmin <= X_DAY_SPAN;
 
     const cfg = {
       type: "line",
@@ -236,23 +294,33 @@
         interaction: { mode: "index", intersect: false },
         scales: {
           x: {
-            type: "linear", min: 1, max: 365,
-            grid: { display: false, drawTicks: false },
+            type: "linear",
+            min: zoomState ? zoomState.xmin : 1,
+            max: zoomState ? zoomState.xmax : 365,
+            // In day mode show a tick mark per day (no vertical lines across the
+            // plot); otherwise keep the clean label-only axis.
+            grid: {
+              display: dayModeX,
+              drawOnChartArea: false,
+              drawTicks: dayModeX,
+              tickLength: 5,
+              tickColor: C.axisLine,
+            },
             border: { color: C.axisLine },
             ticks: {
               color: C.tick, font: { size: 12 }, autoSkip: false, maxRotation: 0,
-              callback: (v) => {
-                const i = MONTH_MIDS.indexOf(v);
-                return i >= 0 ? MONTH_NAMES[i] : "";
-              },
+              callback: xTickLabel,
             },
-            afterBuildTicks: (axis) => { axis.ticks = MONTH_MIDS.map((v) => ({ value: v })); },
+            afterBuildTicks: xAfterBuildTicks,
           },
           y: {
+            min: zoomState ? zoomState.ymin : undefined,
+            max: zoomState ? zoomState.ymax : undefined,
             grid: { color: C.grid },
             border: { display: false },
             ticks: { color: C.tick, font: { size: 12 }, callback: (v) => v + "°" },
             title: { display: true, text: "Temperature (°" + unit + ")", color: C.axisTitle, font: { size: 12 } },
+            afterBuildTicks: yAfterBuildTicks,
           },
         },
         plugins: {
@@ -275,6 +343,7 @@
     if (chart) chart.destroy();
     chart = new Chart(ui.canvas.getContext("2d"), cfg);
 
+    ui.resetZoomBtn.hidden = !zoomState;
     updateTexts(locId, yearKey, s);
   }
 
@@ -343,6 +412,7 @@
       if (e.key === "Escape" && !ui.mapOverlay.hidden) closeMap();
     });
 
+    setupZoom();
     render();
   }
 
@@ -405,6 +475,72 @@
     ui.unitF.setAttribute("aria-pressed", String(unit === "F"));
     ui.unitC.setAttribute("aria-pressed", String(unit === "C"));
     ui.prefUnit.innerHTML = "°" + unit;
+    // The y-crop is stored in the old unit's degrees, so drop it on a switch.
+    zoomState = null;
+    render();
+  }
+
+  // ----- Drag-to-zoom -----
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+  function setupZoom() {
+    const box = ui.zoomBox;
+    let drag = null;
+
+    ui.canvas.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || !chart) return;
+      const rect = ui.canvas.getBoundingClientRect();
+      const area = chart.chartArea;
+      const x = e.clientX - rect.left, y = e.clientY - rect.top;
+      // Only begin a selection inside the plotting area.
+      if (x < area.left || x > area.right || y < area.top || y > area.bottom) return;
+      drag = { x0: x, y0: y, rect, area };
+      e.preventDefault();
+      box.hidden = false;
+      box.style.left = x + "px"; box.style.top = y + "px";
+      box.style.width = "0px"; box.style.height = "0px";
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!drag) return;
+      const a = drag.area;
+      const x = clamp(e.clientX - drag.rect.left, a.left, a.right);
+      const y = clamp(e.clientY - drag.rect.top, a.top, a.bottom);
+      box.style.left = Math.min(x, drag.x0) + "px";
+      box.style.top = Math.min(y, drag.y0) + "px";
+      box.style.width = Math.abs(x - drag.x0) + "px";
+      box.style.height = Math.abs(y - drag.y0) + "px";
+    });
+
+    window.addEventListener("mouseup", (e) => {
+      if (!drag) return;
+      const a = drag.area;
+      const x1 = clamp(e.clientX - drag.rect.left, a.left, a.right);
+      const y1 = clamp(e.clientY - drag.rect.top, a.top, a.bottom);
+      const d = drag;
+      drag = null;
+      box.hidden = true;
+      // Ignore plain clicks / slivers.
+      if (Math.abs(x1 - d.x0) < 6 || Math.abs(y1 - d.y0) < 6) return;
+
+      const xs = chart.scales.x, ys = chart.scales.y;
+      const xa = xs.getValueForPixel(d.x0), xb = xs.getValueForPixel(x1);
+      const ya = ys.getValueForPixel(d.y0), yb = ys.getValueForPixel(y1);
+      const xmin = Math.max(1, Math.min(xa, xb));
+      const xmax = Math.min(365, Math.max(xa, xb));
+      const ymin = Math.min(ya, yb), ymax = Math.max(ya, yb);
+      if (xmax - xmin < 1 || ymax - ymin < 1) return; // too small to be useful
+      zoomState = { xmin, xmax, ymin, ymax };
+      render();
+    });
+
+    ui.canvas.addEventListener("dblclick", resetZoom);
+    ui.resetZoomBtn.addEventListener("click", resetZoom);
+  }
+
+  function resetZoom() {
+    if (!zoomState) return;
+    zoomState = null;
     render();
   }
 

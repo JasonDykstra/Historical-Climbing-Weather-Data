@@ -150,8 +150,26 @@ select {
 
 /* Chart card */
 .chart-card { padding: 22px 24px 18px; }
-.chart-head h2 { margin: 0 0 14px; font-size: 1.15rem; letter-spacing: -0.01em; }
-.chart-holder { position: relative; height: 460px; }
+.chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chart-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
+.reset-zoom {
+  background: var(--panel-2); color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 11px; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+}
+.reset-zoom:hover { border-color: var(--accent); color: var(--ink); }
+.reset-zoom[hidden] { display: none; }
+.chart-hint { margin: 8px 0 14px; font-size: 0.8rem; color: var(--ink-faint); }
+.chart-holder { position: relative; height: 460px; user-select: none; }
+.zoom-box {
+  position: absolute;
+  background: rgba(79, 156, 249, 0.18);
+  border: 1px solid rgba(79, 156, 249, 0.7);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 5;
+}
+.zoom-box[hidden] { display: none; }
 .footnote { margin: 12px 0 0; font-size: 0.8rem; color: var(--ink-faint); }
 
 /* Footer */
