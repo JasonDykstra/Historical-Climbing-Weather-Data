@@ -413,13 +413,16 @@
 
   // Web Mercator caps latitude near +/-85.0511, which makes the world square.
   const WORLD_BOUNDS = () => L.latLngBounds([[-85.0511, -180], [85.0511, 180]]);
+  // Extra zoom on top of the world-fits-vertically floor; higher = tighter
+  // (you can't zoom out as far).
+  const MIN_ZOOM_MARGIN = 0.5;
 
   function applyMinZoom() {
-    // Smallest zoom at which the whole world still fits the viewport. On a
-    // landscape screen the limiting dimension is the height, so this stops you
-    // zooming out past the point where the map fills the screen vertically.
-    // Horizontal wrapping is left on, so you can still scroll sideways forever.
-    map.setMinZoom(map.getBoundsZoom(WORLD_BOUNDS()));
+    // Base = the zoom at which the world just fills the viewport height (the
+    // limiting dimension on a landscape screen). The margin pulls the zoom-out
+    // floor in a bit past that. Horizontal wrapping stays on, so you can still
+    // scroll sideways forever.
+    map.setMinZoom(map.getBoundsZoom(WORLD_BOUNDS()) + MIN_ZOOM_MARGIN);
   }
 
   function initMap() {
