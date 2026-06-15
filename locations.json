@@ -48,5 +48,55 @@
     "name": "Fontainebleau, France",
     "lat": 48.404,
     "lon": 2.702
+  },
+  "bishop_buttermilks": {
+    "name": "Bishop (Buttermilks), CA",
+    "lat": 37.325,
+    "lon": -118.578
+  },
+  "bishop_tablelands": {
+    "name": "Bishop (Happies/Sads), CA",
+    "lat": 37.372,
+    "lon": -118.42
+  },
+  "joes_valley": {
+    "name": "Joe's Valley, UT",
+    "lat": 39.294,
+    "lon": -111.262
+  },
+  "horse_pens_40": {
+    "name": "Horse Pens 40, AL",
+    "lat": 33.917,
+    "lon": -86.327
+  },
+  "stone_fort": {
+    "name": "Stone Fort (LRC), TN",
+    "lat": 35.196,
+    "lon": -85.349
+  },
+  "mount_evans": {
+    "name": "Mount Evans, CO",
+    "lat": 39.6,
+    "lon": -105.64
+  },
+  "north_lake_tahoe": {
+    "name": "North Lake Tahoe, CA",
+    "lat": 39.22,
+    "lon": -120.18
+  },
+  "kirkwood": {
+    "name": "Kirkwood (S. Lake Tahoe), CA",
+    "lat": 38.684,
+    "lon": -120.065
+  },
+  "moes_valley": {
+    "name": "Moe's Valley, UT",
+    "lat": 37.066,
+    "lon": -113.659
+  },
+  "yosemite_camp4": {
+    "name": "Yosemite (Camp 4), CA",
+    "lat": 37.742,
+    "lon": -119.603
   }
 }
