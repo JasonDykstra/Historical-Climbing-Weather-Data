@@ -33,7 +33,11 @@
   // Zoom thresholds: when the visible range shrinks to this size, the axis
   // switches to a finer tick scheme (per-day on x, per-degree on y).
   const X_DAY_SPAN = 75; // days
-  const Y_DEG_SPAN = 26; // degrees
+  // Vertical tick density by zoom: a <=15deg view gets 1deg marks; <=60deg gets
+  // 5deg marks; otherwise Chart.js' automatic ticks. Labels show at a coarser
+  // interval than the marks, leaving the in-between marks unlabeled.
+  const Y_TICK_1_SPAN = 15; // degrees
+  const Y_TICK_5_SPAN = 60; // degrees
 
   // Dark-theme chart colors (kept in sync with styles.css).
   const C = {
@@ -42,6 +46,7 @@
     low: "#60a5fa",
     band: "rgba(148, 163, 184, 0.16)",
     grid: "rgba(148, 163, 184, 0.12)",
+    gridMinor: "rgba(148, 163, 184, 0.06)",
     axisLine: "rgba(148, 163, 184, 0.25)",
     tick: "#8b98a5",
     axisTitle: "#9aa7b4",
@@ -262,17 +267,69 @@
     return dom === 5 ? MONTH_NAMES[monthIndexOf(value)] + " 5" : String(dom);
   }
 
-  // y: 1-degree ticks once the visible range is small enough.
+  // y: finer tick marks as you zoom in (1deg or 5deg). Outside those ranges,
+  // leave Chart.js' automatic ticks in place.
   function yAfterBuildTicks(axis) {
     const span = axis.max - axis.min;
-    if (span > 0 && span <= Y_DEG_SPAN) {
-      const start = Math.ceil(axis.min);
-      const end = Math.floor(axis.max);
-      const ticks = [];
-      for (let t = start; t <= end; t++) ticks.push({ value: t });
-      if (ticks.length) axis.ticks = ticks;
-    }
+    let step;
+    if (span <= Y_TICK_1_SPAN) step = 1;
+    else if (span <= Y_TICK_5_SPAN) step = 5;
+    else return;
+    const start = Math.ceil(axis.min / step) * step;
+    const end = Math.floor(axis.max / step) * step;
+    const ticks = [];
+    for (let t = start; t <= end + 1e-9; t += step) ticks.push({ value: Math.round(t) });
+    if (ticks.length) axis.ticks = ticks;
   }
+
+  // The label / "major gridline" interval for a given visible span. null means
+  // automatic ticks (treat them all as labeled/major).
+  function yLabelStep(span) {
+    if (span <= Y_TICK_1_SPAN) return 5; // 1deg marks, emphasise every 5deg
+    if (span <= Y_TICK_5_SPAN) return 10; // 5deg marks, emphasise every 10deg
+    return null;
+  }
+
+  // A value sits on a "major" (labeled, solid) gridline at the label interval;
+  // in-between values are minor (barely-visible, widely-dashed).
+  function yIsMajor(value, span) {
+    const step = yLabelStep(span);
+    return step == null || Math.round(value) % step === 0;
+  }
+
+  function yTickLabel(value) {
+    const v = Math.round(value); // guard against float artifacts (e.g. 12.00000001)
+    return yIsMajor(v, this.max - this.min) ? v + "°" : "";
+  }
+
+  // We draw the horizontal gridlines ourselves: Chart.js' grid dashing isn't
+  // reliably scriptable per line, so its borderDash stayed solid. Major lines
+  // (the labeled interval) are solid; the in-between minor lines are a faint,
+  // widely-spaced dash.
+  const yGridPlugin = {
+    id: "yGrid",
+    beforeDatasetsDraw(chart) {
+      const y = chart.scales.y;
+      if (!y || !y.ticks) return;
+      const span = y.max - y.min;
+      const area = chart.chartArea;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.lineWidth = 1;
+      y.ticks.forEach((t) => {
+        const py = y.getPixelForValue(t.value);
+        if (py < area.top - 0.5 || py > area.bottom + 0.5) return;
+        const major = yIsMajor(t.value, span);
+        ctx.strokeStyle = major ? C.grid : C.gridMinor;
+        ctx.setLineDash(major ? [] : [2, 16]);
+        ctx.beginPath();
+        ctx.moveTo(area.left, py);
+        ctx.lineTo(area.right, py);
+        ctx.stroke();
+      });
+      ctx.restore();
+    },
+  };
 
   function render() {
     const locId = ui.location.value;
@@ -316,9 +373,14 @@
           y: {
             min: zoomState ? zoomState.ymin : undefined,
             max: zoomState ? zoomState.ymax : undefined,
-            grid: { color: C.grid },
+            grid: {
+              // Gridlines are drawn by yGridPlugin; keep only the tick marks.
+              drawOnChartArea: false,
+              drawTicks: true,
+              tickColor: C.axisLine,
+            },
             border: { display: false },
-            ticks: { color: C.tick, font: { size: 12 }, callback: (v) => v + "°" },
+            ticks: { color: C.tick, font: { size: 12 }, callback: yTickLabel },
             title: { display: true, text: "Temperature (°" + unit + ")", color: C.axisTitle, font: { size: 12 } },
             afterBuildTicks: yAfterBuildTicks,
           },
@@ -338,6 +400,7 @@
           annotation: { annotations: prefAnnotations() },
         },
       },
+      plugins: [yGridPlugin],
     };
 
     if (chart) chart.destroy();
@@ -483,55 +546,103 @@
   // ----- Drag-to-zoom -----
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+  // Min/max y of the visible (toggled-on) series within an x-range, in display
+  // units. Used to trim dead vertical space from a zoom selection.
+  function dataYExtent(xmin, xmax) {
+    let min = Infinity, max = -Infinity;
+    chart.data.datasets.forEach((ds, i) => {
+      if (!ds.label || ds.label.startsWith("_")) return; // skip the fill-band pair
+      if (!chart.isDatasetVisible(i)) return;
+      for (const pt of ds.data) {
+        if (pt.x >= xmin && pt.x <= xmax && pt.y != null) {
+          if (pt.y < min) min = pt.y;
+          if (pt.y > max) max = pt.y;
+        }
+      }
+    });
+    return min <= max ? { min, max } : null;
+  }
+
   function setupZoom() {
     const box = ui.zoomBox;
     let drag = null;
 
-    ui.canvas.addEventListener("mousedown", (e) => {
-      if (e.button !== 0 || !chart) return;
+    // Cursor position clamped into the current plotting area, in canvas pixels.
+    const localPoint = (e) => {
       const rect = ui.canvas.getBoundingClientRect();
-      const area = chart.chartArea;
-      const x = e.clientX - rect.left, y = e.clientY - rect.top;
-      // Only begin a selection inside the plotting area.
-      if (x < area.left || x > area.right || y < area.top || y > area.bottom) return;
-      drag = { x0: x, y0: y, rect, area };
-      e.preventDefault();
-      box.hidden = false;
-      box.style.left = x + "px"; box.style.top = y + "px";
-      box.style.width = "0px"; box.style.height = "0px";
-    });
+      const a = chart.chartArea;
+      return {
+        x: clamp(e.clientX - rect.left, a.left, a.right),
+        y: clamp(e.clientY - rect.top, a.top, a.bottom),
+      };
+    };
 
-    window.addEventListener("mousemove", (e) => {
-      if (!drag) return;
-      const a = drag.area;
-      const x = clamp(e.clientX - drag.rect.left, a.left, a.right);
-      const y = clamp(e.clientY - drag.rect.top, a.top, a.bottom);
+    // Horizontal-only selection: a full-height band over the chosen date
+    // range. The vertical crop is derived from the data on release.
+    const drawBox = (x) => {
+      const a = chart.chartArea;
       box.style.left = Math.min(x, drag.x0) + "px";
-      box.style.top = Math.min(y, drag.y0) + "px";
+      box.style.top = a.top + "px";
       box.style.width = Math.abs(x - drag.x0) + "px";
-      box.style.height = Math.abs(y - drag.y0) + "px";
-    });
+      box.style.height = a.bottom - a.top + "px";
+    };
 
-    window.addEventListener("mouseup", (e) => {
-      if (!drag) return;
-      const a = drag.area;
-      const x1 = clamp(e.clientX - drag.rect.left, a.left, a.right);
-      const y1 = clamp(e.clientY - drag.rect.top, a.top, a.bottom);
-      const d = drag;
+    const cancelDrag = () => {
       drag = null;
       box.hidden = true;
-      // Ignore plain clicks / slivers.
-      if (Math.abs(x1 - d.x0) < 6 || Math.abs(y1 - d.y0) < 6) return;
+    };
 
-      const xs = chart.scales.x, ys = chart.scales.y;
+    ui.canvas.addEventListener("pointerdown", (e) => {
+      if (!chart || e.button !== 0) return; // primary button only
+      const p = localPoint(e);
+      drag = { x0: p.x };
+      // Capture so we keep getting move/up even if the cursor leaves the canvas.
+      try { ui.canvas.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      e.preventDefault();
+      box.hidden = false;
+      drawBox(p.x);
+    });
+
+    ui.canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      drawBox(localPoint(e).x);
+    });
+
+    ui.canvas.addEventListener("pointerup", (e) => {
+      if (!drag || e.button !== 0) return;
+      const x1 = localPoint(e).x;
+      const d = drag;
+      cancelDrag();
+      // Ignore plain clicks: only the horizontal sweep matters.
+      if (Math.abs(x1 - d.x0) < 6) return;
+
+      const xs = chart.scales.x;
       const xa = xs.getValueForPixel(d.x0), xb = xs.getValueForPixel(x1);
-      const ya = ys.getValueForPixel(d.y0), yb = ys.getValueForPixel(y1);
       const xmin = Math.max(1, Math.min(xa, xb));
       const xmax = Math.min(365, Math.max(xa, xb));
-      const ymin = Math.min(ya, yb), ymax = Math.max(ya, yb);
-      if (xmax - xmin < 1 || ymax - ymin < 1) return; // too small to be useful
+      if (xmax - xmin < 1) return; // too narrow to be useful
+
+      // Vertical crop is always derived from the high/low lines in the chosen
+      // window, with a small pad, so the graph never ends up compressed.
+      let ymin, ymax;
+      const ext = dataYExtent(xmin, xmax);
+      if (ext) {
+        const pad = Math.max(1, (ext.max - ext.min) * 0.05);
+        ymin = Math.floor(ext.min - pad); // integer bounds -> clean axis labels
+        ymax = Math.ceil(ext.max + pad);
+      }
       zoomState = { xmin, xmax, ymin, ymax };
       render();
+    });
+
+    ui.canvas.addEventListener("pointercancel", cancelDrag);
+
+    // Right-click cancels an in-progress selection (and suppresses the menu).
+    ui.canvas.addEventListener("contextmenu", (e) => {
+      if (drag) { cancelDrag(); e.preventDefault(); }
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drag) cancelDrag();
     });
 
     ui.canvas.addEventListener("dblclick", resetZoom);
@@ -566,6 +677,7 @@
       zoomControl: true,
       zoomSnap: 0, // let the world fit the height exactly, not just integer zooms
       worldCopyJump: true, // seamless infinite horizontal panning
+      maxBoundsViscosity: 1.0, // hard wall at maxBounds (no drag past the edges)
     }).setView([30, 0], 2);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -592,6 +704,11 @@
         .on("click", () => { selectLocation(slug); closeMap(); });
       points.push([loc.lat, loc.lon]);
     });
+
+    // Clamp vertical panning to the world's extent so you never see the blank
+    // background past the poles. Longitude is left unbounded (+/-Infinity) so
+    // the infinite horizontal wrapping still works.
+    map.setMaxBounds(L.latLngBounds([-85.0511, -Infinity], [85.0511, Infinity]));
 
     map.invalidateSize();
     applyMinZoom();

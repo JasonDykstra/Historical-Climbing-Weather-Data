@@ -161,6 +161,7 @@ select {
 .reset-zoom[hidden] { display: none; }
 .chart-hint { margin: 8px 0 14px; font-size: 0.8rem; color: var(--ink-faint); }
 .chart-holder { position: relative; height: 460px; user-select: none; }
+.chart-holder canvas { cursor: crosshair; touch-action: none; }
 .zoom-box {
   position: absolute;
   background: rgba(79, 156, 249, 0.18);
