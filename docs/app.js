@@ -328,7 +328,11 @@
     ui.location.addEventListener("change", () => selectLocation(ui.location.value));
     [ui.year, ui.smoothing].forEach((c) => c.addEventListener("change", render));
     [ui.high, ui.avg, ui.low, ui.band, ui.prefToggle].forEach((c) => c.addEventListener("change", render));
+    // Live update while typing; enforce min <= max once the value is committed.
     [ui.prefMin, ui.prefMax].forEach((c) => c.addEventListener("input", render));
+    ui.prefMin.addEventListener("change", () => { clampPref("min"); render(); });
+    ui.prefMax.addEventListener("change", () => { clampPref("max"); render(); });
+    updatePrefBounds();
     ui.unitF.addEventListener("click", () => setUnit("F"));
     ui.unitC.addEventListener("click", () => setUnit("C"));
 
@@ -347,6 +351,25 @@
     ui.location.value = slug;
     populateYears(slug);
     render();
+  }
+
+  // Keep the preferable-range boxes ordered: Min can't exceed Max and vice
+  // versa. Clamps the box that was just edited to the other one.
+  function clampPref(edited) {
+    const lo = parseFloat(ui.prefMin.value);
+    const hi = parseFloat(ui.prefMax.value);
+    if (!isNaN(lo) && !isNaN(hi) && lo > hi) {
+      if (edited === "max") ui.prefMax.value = String(lo);
+      else ui.prefMin.value = String(hi);
+    }
+    updatePrefBounds();
+  }
+
+  // Mirror the order into the inputs' min/max attributes so the spinner arrows
+  // and browser validation also respect it.
+  function updatePrefBounds() {
+    ui.prefMin.max = ui.prefMax.value;
+    ui.prefMax.min = ui.prefMin.value;
   }
 
   function populateYears(locId) {
@@ -374,6 +397,7 @@
     };
     convertField(ui.prefMin);
     convertField(ui.prefMax);
+    updatePrefBounds();
 
     unit = next;
     ui.unitF.classList.toggle("active", unit === "F");
@@ -391,9 +415,10 @@
   const WORLD_BOUNDS = () => L.latLngBounds([[-85.0511, -180], [85.0511, 180]]);
 
   function applyMinZoom() {
-    // Smallest zoom at which the whole world still fits. On a landscape screen
-    // this is limited by the vertical extent, so you can't zoom out past the
-    // point where the map fills the height (and thus can't make it wrap).
+    // Smallest zoom at which the whole world still fits the viewport. On a
+    // landscape screen the limiting dimension is the height, so this stops you
+    // zooming out past the point where the map fills the screen vertically.
+    // Horizontal wrapping is left on, so you can still scroll sideways forever.
     map.setMinZoom(map.getBoundsZoom(WORLD_BOUNDS()));
   }
 
@@ -401,9 +426,7 @@
     map = L.map("map", {
       zoomControl: true,
       zoomSnap: 0, // let the world fit the height exactly, not just integer zooms
-      worldCopyJump: false,
-      maxBounds: WORLD_BOUNDS(),
-      maxBoundsViscosity: 1.0,
+      worldCopyJump: true, // seamless infinite horizontal panning
     }).setView([30, 0], 2);
 
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -411,8 +434,6 @@
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 19,
-      noWrap: true, // don't repeat the world horizontally
-      bounds: WORLD_BOUNDS(),
     }).addTo(map);
 
     const pinIcon = L.divIcon({
